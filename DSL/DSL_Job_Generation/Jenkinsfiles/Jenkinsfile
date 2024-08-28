@@ -1,0 +1,69 @@
+def returnParametersForDsl() {
+    return [DSL_SLAVES: env.DSL_SLAVES, CICD_SLAVES: env.CICD_SLAVES, TEAM_EMAIL: env.TEAM_EMAIL, PERMISSION_GROUPS: env.PERMISSION_GROUPS]
+}
+
+def returnListOfDSLJobs() {
+    def listOfDSLJobs = []
+
+    listOfDSLJobs = listOfDSLJobs.plus('DSL/OssCicdPipelineGenerator.groovy')
+
+    return listOfDSLJobs
+}
+
+pipeline {
+    agent {
+        node {
+            label DSL_SLAVES
+        }
+    }
+
+    environment {
+        DSL_CLASSPATH = 'DSL'
+    }
+
+    stages {
+        stage ('Validate required parameters set') {
+            when {
+                anyOf {
+                    expression {
+                        env.DSL_SLAVES == null
+                    }
+                    expression {
+                        env.CICD_SLAVES == null
+                    }
+                    expression {
+                        env.TEAM_EMAIL == null
+                    }
+                }
+            }
+            steps {
+                error('Some required parameter(s) not set. Please supply a value for all required parameters')
+            }
+        }
+        stage ('Default PERMISSION_GROUPS if null') {
+            when {
+                expression {
+                    env.PERMISSION_GROUPS == null
+                }
+            }
+            steps {
+                script {
+                    env.PERMISSION_GROUPS = 'authenticated'
+                }
+            }
+        }
+
+        stage('Generate OSS CICD DSL Jobs') {
+            steps {
+                jobDsl targets: returnListOfDSLJobs().join('\n'),
+                    additionalParameters: returnParametersForDsl(),
+                    additionalClasspath: env.DSL_CLASSPATH
+            }
+        }
+    }
+    post {
+        always {
+            cleanWs()
+        }
+    }
+}

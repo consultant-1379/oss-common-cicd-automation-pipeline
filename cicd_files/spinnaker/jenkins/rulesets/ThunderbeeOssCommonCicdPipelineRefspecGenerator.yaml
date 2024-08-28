@@ -1,0 +1,31 @@
+modelVersion: 2.0
+
+description: 'Thunderbee: Rules for running pre code review the Common CICD Automation Pipeline repo'
+
+env:
+  - PWD
+  - WORKSPACE
+  - PIPELINE_REFSPEC
+  - PATH_TO_CSV
+  - DESTINATION_APPLICATION
+  - GENERATED_PIPELINE_NAME
+  - TB_GERRIT_CREDS
+
+rules:
+  prepare-repo:
+    - task: create-spinnaker-pipeline-directory
+      cmd: mkdir spinnaker-pipelines-repo
+    - task: clone-spinnaker-pipelines-repo
+      cmd: cd ${env.WORKSPACE}/spinnaker-pipelines-repo && git clone https://${env.TB_GERRIT_CREDS}@gerrit-gamma.gic.ericsson.se/a/OSS/com.ericsson.oss.cicd/oss-common-cicd-pipeline-resources
+    - task: checkout-refspec
+      cmd: cd ${env.WORKSPACE}/spinnaker-pipelines-repo/oss-common-cicd-pipeline-resources && git fetch https://${env.TB_GERRIT_CREDS}@gerrit-gamma.gic.ericsson.se/a/OSS/com.ericsson.oss.cicd/oss-common-cicd-pipeline-resources ${env.PIPELINE_REFSPEC} && git checkout FETCH_HEAD
+    - task: touch-pipeline-file
+      cmd: cd ${env.WORKSPACE}/spinnaker-pipelines-repo/oss-common-cicd-pipeline-resources && touch pipeline.json
+
+  modify-csv-values:
+    - task: modify-application-name
+      cmd: sed -Ei "2 s/[^,]*/${env.DESTINATION_APPLICATION}/1" ${env.WORKSPACE}/spinnaker-pipelines-repo/oss-common-cicd-pipeline-resources/${env.PATH_TO_CSV}
+    - task: modify-pipeline-name
+      cmd: sed -Ei "2 s/[^,]*/${env.GENERATED_PIPELINE_NAME}/2" ${env.WORKSPACE}/spinnaker-pipelines-repo/oss-common-cicd-pipeline-resources/${env.PATH_TO_CSV}
+    - task: delete-lines-beyond-second-line
+      cmd: sed -i '3,$d' ${env.WORKSPACE}/spinnaker-pipelines-repo/oss-common-cicd-pipeline-resources/${env.PATH_TO_CSV}
